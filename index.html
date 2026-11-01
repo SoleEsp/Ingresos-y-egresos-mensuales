@@ -1,3 +1,4 @@
+HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -111,4 +112,417 @@
   
   .bar { height: 12px; background: #f1f5f9; border-radius: 10px; overflow: hidden; margin-top: 6px; }
   .bar > div { height: 100%; background: #f472b6; border-radius: 10px; }
-  .bar
+  .bar > div.over { background: #fda4af; }
+  .bud-row { margin-bottom: 14px; font-size: 14px; }
+  .bud-row input { width: 110px; }
+  
+  .muted { color: #94a3b8; font-size: 13px; }
+  .hidden { display: none; }
+
+  /* Estilos Lista de Tareas Gatuna */
+  .todo-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff0f6; border-radius: 12px; margin-bottom: 8px; border: 1px solid #fbcfe8; }
+  .todo-item.done { background: #f1f5f9; text-decoration: line-through; opacity: 0.6; }
+  .todo-item input[type=checkbox] { width: 18px; height: 18px; accent-color: #f472b6; cursor: pointer; }
+  .todo-item span { flex: 1; font-weight: 600; }
+
+  @media (max-width:600px){ main{ margin:0 8px 16px; padding:16px; } nav{ padding:12px 8px 0; } }
+</style>
+</head>
+<body>
+
+<div id="status" class="status">🐾 Conectando con Firebase...</div>
+
+<header>
+  <h1>🐱 Control Gatuno de Finanzas 🐾</h1>
+  <label style="color:#701a75;flex-direction:row;align-items:center;gap:8px">Mes:
+    <input type="month" id="mes">
+  </label>
+</header>
+
+<nav>
+  <button class="active" data-tab="resumen">📊 Resumen</button>
+  <button data-tab="movs">💸 Movimientos</button>
+  <button data-tab="pres">🎯 Presupuesto</button>
+  <button data-tab="tareas">📋 Tareas Semanales 🐾</button>
+</nav>
+
+<main>
+  <!-- RESUMEN -->
+  <section id="resumen">
+    <div class="cards" id="cards"></div>
+    <div class="grid2">
+      <div class="box">
+        <h3>🐾 Gastos por tipo (Mes Seleccionado)</h3>
+        <div id="pie"></div>
+        <ul class="legend" id="legend"></ul>
+      </div>
+      <div class="box">
+        <h3>🐟 Ingresos vs Gastos (Últimos 6 Meses)</h3>
+        <div id="bars"></div>
+        <p class="muted">🟩 Ingresos &nbsp; 🟥 Gastos</p>
+      </div>
+    </div>
+    <div id="tips"></div>
+  </section>
+
+  <!-- MOVIMIENTOS -->
+  <section id="movs" class="hidden">
+    <form class="f" id="form">
+      <label>Tipo
+        <select id="tipo">
+          <option value="gasto">🐱 Gasto</option>
+          <option value="ingreso">🐟 Ingreso</option>
+        </select>
+      </label>
+      <label>Fecha
+        <input type="date" id="fecha" required>
+      </label>
+      <label>Categoría
+        <select id="categoria"></select>
+      </label>
+      <label>Descripción
+        <input type="text" id="desc" placeholder="Ej: Croquetas" maxlength="60">
+      </label>
+      <label>Monto
+        <input type="number" id="monto" step="0.01" min="0.01" required placeholder="0.00">
+      </label>
+      <button class="p" type="submit">+ Agregar</button>
+    </form>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0;color:#9d174d">Movimientos del Mes</h3>
+      <button class="s" id="csv">Exportar CSV 📄</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Descripción</th><th class="r">Monto</th><th></th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PRESUPUESTO -->
+  <section id="pres" class="hidden">
+    <h3 style="margin-top:0;color:#9d174d">Presupuesto mensual por categoría</h3>
+    <p class="muted">Define un límite mensual. La barra te mostrará cuánto has consumido.</p>
+    <div id="presList"></div>
+  </section>
+
+  <!-- TAREAS SEMANALES -->
+  <section id="tareas" class="hidden">
+    <h3 style="margin-top:0;color:#9d174d">📋 Tareas y Actividades Semanales 🐾</h3>
+    <p class="muted">Planifica las actividades de tu semana y ve tachándolas a medida que las completes.</p>
+    <form class="f" id="formTask" style="grid-template-columns: 1fr 140px auto;">
+      <label>Nueva Actividad
+        <input type="text" id="taskDesc" placeholder="Ej: Comprar comida del gato" required maxlength="80">
+      </label>
+      <label>Días / Fecha
+        <input type="text" id="taskDay" placeholder="Ej: Lunes / 12-Nov">
+      </label>
+      <button class="p" type="submit">+ Guardar Tarea</button>
+    </form>
+    <div id="todoList" style="margin-top: 16px;"></div>
+  </section>
+</main>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+  // TODO: Reemplaza estas credenciales con las de tu proyecto en Firebase
+  const firebaseConfig = {
+    apiKey: "TU_API_KEY",
+    authDomain: "TU_PROYECTO.firebaseapp.com",
+    databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
+    projectId: "TU_PROYECTO",
+    storageBucket: "TU_PROYECTO.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abcdef"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Educación","Ocio","Ropa","Mascotas 🐱","Otros"];
+  const CATS_INGRESO = ["Salario","Freelance","Inversiones","Otros ingresos"];
+  const PAL = ["#f472b6","#93c5fd","#86efac","#fde047","#c084fc","#fb923c","#f43f5e","#38bdf8","#a3e635","#e879f9"];
+
+  let tx = [];
+  let budgets = {};
+  let tasks = [];
+
+  const $ = id => document.getElementById(id);
+  const fmt = n => "$" + Number(n).toLocaleString("es", {minimumFractionDigits:2, maximumFractionDigits:2});
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const today = () => new Date().toISOString().slice(0,10);
+  const currentMonth = () => $("mes").value;
+
+  function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+
+  // Listener para sincronización en tiempo real desde Firebase
+  onValue(ref(db, "gastos_app"), (snapshot) => {
+    const data = snapshot.val() || {};
+    
+    // Sincronizar Transacciones
+    const rawTx = data.tx || {};
+    tx = Object.keys(rawTx).map(key => ({ id: key, ...rawTx[key] }));
+
+    // Sincronizar Presupuestos
+    budgets = data.budgets || {};
+
+    // Sincronizar Tareas
+    const rawTasks = data.tasks || {};
+    tasks = Object.keys(rawTasks).map(key => ({ id: key, ...rawTasks[key] }));
+    
+    $("status").innerText = "🐾 Conectado a Firebase — ¡Sincronizado en tiempo real! 🐱";
+    $("status").style.background = "#e2f0d9";
+    $("status").style.color = "#385d25";
+    
+    renderAll();
+  }, (error) => {
+    $("status").innerText = "⚠️ Error al conectar con Firebase. Verifica tus credenciales.";
+    $("status").style.background = "#ffe4e6";
+    $("status").style.color = "#e11d48";
+  });
+
+  function totalsFor(month){
+    const list = tx.filter(t => t.date && t.date.startsWith(month));
+    const ing = list.filter(t => t.tipo === "ingreso").reduce((a,t)=>a+t.monto,0);
+    const gas = list.filter(t => t.tipo === "gasto").reduce((a,t)=>a+t.monto,0);
+    const porCat = {};
+    list.filter(t => t.tipo === "gasto").forEach(t => porCat[t.categoria] = (porCat[t.categoria]||0) + t.monto);
+    return {list, ing, gas, porCat};
+  }
+
+  function renderCategorias(){
+    const tipo = $("tipo").value;
+    const cats = tipo === "gasto" ? CATS_GASTO : CATS_INGRESO;
+    $("categoria").innerHTML = cats.map(c => `<option>${c}</option>`).join("");
+  }
+
+  function renderResumen(){
+    const m = currentMonth();
+    const {ing, gas, porCat} = totalsFor(m);
+    const ahorro = ing - gas;
+    const tasa = ing > 0 ? (ahorro / ing) * 100 : 0;
+
+    $("cards").innerHTML = `
+      <div class="card ing"><small>Ingresos 🐟</small><strong>${fmt(ing)}</strong></div>
+      <div class="card gas"><small>Gastos 🐾</small><strong>${fmt(gas)}</strong></div>
+      <div class="card aho"><small>Ahorro / Saldo 😸</small><strong style="color:${ahorro>=0?'#2563eb':'#e11d48'}">${fmt(ahorro)}</strong></div>
+      <div class="card tasa"><small>Tasa de Ahorro 🎯</small><strong>${tasa.toFixed(1)}%</strong></div>`;
+
+    const entries = Object.entries(porCat).sort((a,b)=>b[1]-a[1]);
+    const total = entries.reduce((a,e)=>a+e[1],0);
+    if (!total){
+      $("pie").innerHTML = `<p class="muted">No hay gastos registrados este mes. 🐱</p>`;
+      $("legend").innerHTML = "";
+    } else {
+      let a = -Math.PI/2, paths = "", legend = "";
+      entries.forEach(([k,v],i)=>{
+        const f = v/total, color = PAL[i % PAL.length];
+        if (f > 0.9999){
+          paths += `<circle cx="100" cy="100" r="90" fill="${color}"/>`;
+        } else {
+          const a2 = a + f*2*Math.PI;
+          const x1 = 100+90*Math.cos(a), y1 = 100+90*Math.sin(a);
+          const x2 = 100+90*Math.cos(a2), y2 = 100+90*Math.sin(a2);
+          const large = f > 0.5 ? 1 : 0;
+          paths += `<path d="M100,100 L${x1},${y1} A90,90 0 ${large} 1 ${x2},${y2} Z" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+          a = a2;
+        }
+        legend += `<li><span class="dot" style="background:${color}"></span>${esc(k)}: <b>${fmt(v)}</b> (${(f*100).toFixed(1)}%)</li>`;
+      });
+      $("pie").innerHTML = `<svg viewBox="0 0 200 200" style="max-width:240px;display:block;margin:auto">${paths}</svg>`;
+      $("legend").innerHTML = legend;
+    }
+
+    const [y, mo] = m.split("-").map(Number);
+    const meses = [];
+    for (let k=5; k>=0; k--){
+      const d = new Date(y, mo-1-k, 1);
+      const key = monthKey(d);
+      const t = totalsFor(key);
+      meses.push({label: d.toLocaleString("es",{month:"short"}), ing: t.ing, gas: t.gas});
+    }
+    const W=600, H=260, max = Math.max(1, ...meses.map(x=>Math.max(x.ing,x.gas)));
+    const gw = W/meses.length;
+    let bars = "";
+    meses.forEach((x,i)=>{
+      const x0 = i*gw;
+      const hi = (x.ing/max)*(H-50), hg = (x.gas/max)*(H-50);
+      bars += `<rect x="${x0+gw*0.15}" y="${H-30-hi}" width="${gw*0.3}" height="${hi}" fill="#86efac" rx="4"/>`;
+      bars += `<rect x="${x0+gw*0.5}" y="${H-30-hg}" width="${gw*0.3}" height="${hg}" fill="#fda4af" rx="4"/>`;
+      bars += `<text x="${x0+gw/2}" y="${H-10}" text-anchor="middle" font-size="14" fill="#64748b">${x.label}</text>`;
+    });
+    bars += `<line x1="0" y1="${H-30}" x2="${W}" y2="${H-30}" stroke="#fbcfe8"/>`;
+    $("bars").innerHTML = `<svg viewBox="0 0 ${W} ${H}">${bars}</svg>`;
+
+    let tips = "";
+    if (ing === 0 && gas === 0){
+      tips = `<div class="tips"><b>🐱 ¡Empieza a registrar tus finanzas!</b><p class="muted">Añade movimientos para ver tus gráficas gatunas.</p></div>`;
+    } else {
+      const items = [];
+      if (gas > ing) items.push(`⚠️ Estás gastando más de lo que ingresas. Te faltan <b>${fmt(gas-ing)}</b> este mes.`);
+      else if (tasa < 20) items.push(`📈 Tu tasa de ahorro es ${tasa.toFixed(1)}%. Una meta recomendada es el 20% (${fmt(ing*0.2)}).`);
+      else items.push(`😸 ¡Excelente trabajo! Estás ahorrando el ${tasa.toFixed(1)}% de tus ingresos.`);
+      if (entries.length){
+        const [cat, val] = entries[0];
+        items.push(`🔎 Tu mayor gasto es en <b>${esc(cat)}</b> con ${fmt(val)} (${(val/total*100).toFixed(1)}%).`);
+      }
+      const excedidos = Object.keys(budgets).filter(c => budgets[c] > 0 && (porCat[c]||0) > budgets[c]);
+      if (excedidos.length) items.push(`🚨 Superaste tu presupuesto en: ${excedidos.map(esc).join(", ")}.`);
+      const hay = items.some(s=>s.startsWith("⚠️")||s.startsWith("🚨"));
+      tips = `<div class="tips ${hay?'warn':''}"><b>Consejos Gatunos</b><ul>${items.map(i=>`<li>${i}</li>`).join("")}</ul></div>`;
+    }
+    $("tips").innerHTML = tips;
+  }
+
+  function renderMovs(){
+    const m = currentMonth();
+    const list = tx.filter(t => t.date && t.date.startsWith(m)).sort((a,b)=> b.date.localeCompare(a.date));
+    $("tbody").innerHTML = list.length ? list.map(t => `
+      <tr>
+        <td>${t.date}</td>
+        <td class="${t.tipo==='ingreso'?'ingt':'gast'}">${t.tipo==='ingreso'?'🐟 Ingreso':'🐾 Gasto'}</td>
+        <td>${esc(t.categoria)}</td>
+        <td>${esc(t.desc||'')}</td>
+        <td class="r">${fmt(t.monto)}</td>
+        <td><button class="d" data-id="${t.id}">Eliminar</button></td>
+      </tr>`).join("")
+      : `<tr><td colspan="6" class="muted">No hay movimientos registrados este mes. 🐱</td></tr>`;
+
+    document.querySelectorAll("button.d").forEach(btn => {
+      btn.onclick = () => borrar(btn.dataset.id);
+    });
+  }
+
+  function renderPres(){
+    const m = currentMonth();
+    const {porCat} = totalsFor(m);
+    $("presList").innerHTML = CATS_GASTO.map(c => {
+      const gastado = porCat[c] || 0;
+      const lim = budgets[c] || 0;
+      const pct = lim > 0 ? Math.min(100, gastado/lim*100) : 0;
+      const over = lim > 0 && gastado > lim;
+      return `<div class="bud-row">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span><b>${c}</b> — Gastado ${fmt(gastado)}${lim>0 ? ` de ${fmt(lim)}` : ''}</span>
+          <label style="flex-direction:row;align-items:center;gap:6px">Límite $
+            <input type="number" min="0" step="1" value="${lim||''}" data-cat="${c}" class="inp-budget">
+          </label>
+        </div>
+        ${lim>0 ? `<div class="bar"><div class="${over?'over':''}" style="width:${pct}%"></div></div>` : ''}
+      </div>`;
+    }).join("");
+
+    document.querySelectorAll(".inp-budget").forEach(inp => {
+      inp.onchange = (e) => setBudget(e.target.dataset.cat, e.target.value);
+    });
+  }
+
+  function renderTareas(){
+    const list = tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
+    $("todoList").innerHTML = list.length ? list.map(t => `
+      <div class="todo-item ${t.done ? 'done' : ''}">
+        <input type="checkbox" ${t.done ? 'checked' : ''} data-id="${t.id}" class="chk-task">
+        <span>${esc(t.desc)} ${t.day ? `<small style="color:#71717a">(${esc(t.day)})</small>` : ''}</span>
+        <button class="d" data-id="${t.id}" class="btn-del-task">✕</button>
+      </div>
+    `).join("") : `<p class="muted">No hay tareas programadas para esta semana. 🐾</p>`;
+
+    document.querySelectorAll(".chk-task").forEach(chk => {
+      chk.onchange = (e) => toggleTask(e.target.dataset.id, e.target.checked);
+    });
+
+    document.querySelectorAll("#todoList button.d").forEach(btn => {
+      btn.onclick = () => borrarTask(btn.dataset.id);
+    });
+  }
+
+  function setBudget(c, v){
+    const n = parseFloat(v);
+    if (n > 0) budgets[c] = n; else delete budgets[c];
+    set(ref(db, "gastos_app/budgets"), budgets);
+  }
+
+  function borrar(id){
+    if (!confirm("¿Eliminar este movimiento?")) return;
+    remove(ref(db, "gastos_app/tx/" + id));
+  }
+
+  function toggleTask(id, done){
+    update(ref(db, "gastos_app/tasks/" + id), { done });
+  }
+
+  function borrarTask(id){
+    remove(ref(db, "gastos_app/tasks/" + id));
+  }
+
+  function renderAll(){ 
+    renderResumen(); 
+    renderMovs(); 
+    renderPres(); 
+    renderTareas();
+  }
+
+  $("tipo").addEventListener("change", renderCategorias);
+  
+  // Agregar Transacción
+  $("form").addEventListener("submit", e => {
+    e.preventDefault();
+    const monto = parseFloat($("monto").value);
+    if (!(monto > 0)) return;
+
+    push(ref(db, "gastos_app/tx"), {
+      tipo: $("tipo").value,
+      date: $("fecha").value || today(),
+      categoria: $("categoria").value,
+      desc: $("desc").value.trim(),
+      monto
+    });
+
+    $("desc").value = ""; $("monto").value = "";
+    if (!$("fecha").value.startsWith(currentMonth())) $("mes").value = $("fecha").value.slice(0,7);
+  });
+
+  // Agregar Tarea Semanal
+  $("formTask").addEventListener("submit", e => {
+    e.preventDefault();
+    const desc = $("taskDesc").value.trim();
+    if (!desc) return;
+
+    push(ref(db, "gastos_app/tasks"), {
+      desc,
+      day: $("taskDay").value.trim(),
+      done: false
+    });
+
+    $("taskDesc").value = ""; 
+    $("taskDay").value = "";
+  });
+
+  // Exportar CSV
+  $("csv").addEventListener("click", () => {
+    const m = currentMonth();
+    const rows = [["Fecha","Tipo","Categoria","Descripcion","Monto"]];
+    tx.filter(t=>t.date && t.date.startsWith(m)).forEach(t => rows.push([t.date,t.tipo,t.categoria,`"${(t.desc||'').replace(/"/g,'""')}"`,t.monto]));
+    const blob = new Blob([rows.map(r=>r.join(";")).join("\n")], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `gastos_${m}.csv`; a.click();
+  });
+
+  // Navegación de pestañas
+  document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    ["resumen","movs","pres","tareas"].forEach(id => $(id).classList.toggle("hidden", id !== b.dataset.tab));
+  }));
+
+  $("mes").value = today().slice(0,7);
+  $("fecha").value = today();
+  $("mes").addEventListener("change", renderAll);
+  renderCategorias();
+</script>
+</body>
+</html>

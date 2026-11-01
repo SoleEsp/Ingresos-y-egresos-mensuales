@@ -1,4 +1,3 @@
-HTML
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -12,15 +11,6 @@ HTML
     font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
     background: #fff5f8; 
     color: #4a3e3d; 
-  }
-  
-  .status { 
-    background: #e2f0d9; 
-    color: #385d25; 
-    padding: 8px 16px; 
-    font-size: 13px; 
-    text-align: center; 
-    font-weight: 700; 
   }
   
   header { 
@@ -130,8 +120,6 @@ HTML
 </head>
 <body>
 
-<div id="status" class="status">🐾 Conectando con Firebase...</div>
-
 <header>
   <h1>🐱 Control Gatuno de Finanzas 🐾</h1>
   <label style="color:#701a75;flex-direction:row;align-items:center;gap:8px">Mes:
@@ -224,66 +212,28 @@ HTML
   </section>
 </main>
 
-<!-- Firebase SDK -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-  import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-  // TODO: Reemplaza estas credenciales con las de tu proyecto en Firebase
-  const firebaseConfig = {
-    apiKey: "TU_API_KEY",
-    authDomain: "TU_PROYECTO.firebaseapp.com",
-    databaseURL: "https://TU_PROYECTO-default-rtdb.firebaseio.com",
-    projectId: "TU_PROYECTO",
-    storageBucket: "TU_PROYECTO.appspot.com",
-    messagingSenderId: "123456789",
-    appId: "1:123456789:web:abcdef"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-
+<script>
   const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Educación","Ocio","Ropa","Mascotas 🐱","Otros"];
   const CATS_INGRESO = ["Salario","Freelance","Inversiones","Otros ingresos"];
   const PAL = ["#f472b6","#93c5fd","#86efac","#fde047","#c084fc","#fb923c","#f43f5e","#38bdf8","#a3e635","#e879f9"];
 
-  let tx = [];
-  let budgets = {};
-  let tasks = [];
+  let tx = JSON.parse(localStorage.getItem("gastos_tx") || "[]");
+  let budgets = JSON.parse(localStorage.getItem("gastos_bud") || "{}");
+  let tasks = JSON.parse(localStorage.getItem("gastos_tasks") || "[]");
 
   const $ = id => document.getElementById(id);
+  const save = () => {
+    localStorage.setItem("gastos_tx", JSON.stringify(tx));
+    localStorage.setItem("gastos_bud", JSON.stringify(budgets));
+    localStorage.setItem("gastos_tasks", JSON.stringify(tasks));
+  };
+
   const fmt = n => "$" + Number(n).toLocaleString("es", {minimumFractionDigits:2, maximumFractionDigits:2});
   const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const today = () => new Date().toISOString().slice(0,10);
   const currentMonth = () => $("mes").value;
 
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
-
-  // Listener para sincronización en tiempo real desde Firebase
-  onValue(ref(db, "gastos_app"), (snapshot) => {
-    const data = snapshot.val() || {};
-    
-    // Sincronizar Transacciones
-    const rawTx = data.tx || {};
-    tx = Object.keys(rawTx).map(key => ({ id: key, ...rawTx[key] }));
-
-    // Sincronizar Presupuestos
-    budgets = data.budgets || {};
-
-    // Sincronizar Tareas
-    const rawTasks = data.tasks || {};
-    tasks = Object.keys(rawTasks).map(key => ({ id: key, ...rawTasks[key] }));
-    
-    $("status").innerText = "🐾 Conectado a Firebase — ¡Sincronizado en tiempo real! 🐱";
-    $("status").style.background = "#e2f0d9";
-    $("status").style.color = "#385d25";
-    
-    renderAll();
-  }, (error) => {
-    $("status").innerText = "⚠️ Error al conectar con Firebase. Verifica tus credenciales.";
-    $("status").style.background = "#ffe4e6";
-    $("status").style.color = "#e11d48";
-  });
 
   function totalsFor(month){
     const list = tx.filter(t => t.date && t.date.startsWith(month));
@@ -388,13 +338,9 @@ HTML
         <td>${esc(t.categoria)}</td>
         <td>${esc(t.desc||'')}</td>
         <td class="r">${fmt(t.monto)}</td>
-        <td><button class="d" data-id="${t.id}">Eliminar</button></td>
+        <td><button class="d" onclick="borrar('${t.id}')">Eliminar</button></td>
       </tr>`).join("")
       : `<tr><td colspan="6" class="muted">No hay movimientos registrados este mes. 🐱</td></tr>`;
-
-    document.querySelectorAll("button.d").forEach(btn => {
-      btn.onclick = () => borrar(btn.dataset.id);
-    });
   }
 
   function renderPres(){
@@ -409,54 +355,46 @@ HTML
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span><b>${c}</b> — Gastado ${fmt(gastado)}${lim>0 ? ` de ${fmt(lim)}` : ''}</span>
           <label style="flex-direction:row;align-items:center;gap:6px">Límite $
-            <input type="number" min="0" step="1" value="${lim||''}" data-cat="${c}" class="inp-budget">
+            <input type="number" min="0" step="1" value="${lim||''}" onchange="setBudget('${c}', this.value)">
           </label>
         </div>
         ${lim>0 ? `<div class="bar"><div class="${over?'over':''}" style="width:${pct}%"></div></div>` : ''}
       </div>`;
     }).join("");
-
-    document.querySelectorAll(".inp-budget").forEach(inp => {
-      inp.onchange = (e) => setBudget(e.target.dataset.cat, e.target.value);
-    });
   }
 
   function renderTareas(){
     const list = tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
     $("todoList").innerHTML = list.length ? list.map(t => `
       <div class="todo-item ${t.done ? 'done' : ''}">
-        <input type="checkbox" ${t.done ? 'checked' : ''} data-id="${t.id}" class="chk-task">
+        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)">
         <span>${esc(t.desc)} ${t.day ? `<small style="color:#71717a">(${esc(t.day)})</small>` : ''}</span>
-        <button class="d" data-id="${t.id}" class="btn-del-task">✕</button>
+        <button class="d" onclick="borrarTask('${t.id}')">✕</button>
       </div>
     `).join("") : `<p class="muted">No hay tareas programadas para esta semana. 🐾</p>`;
-
-    document.querySelectorAll(".chk-task").forEach(chk => {
-      chk.onchange = (e) => toggleTask(e.target.dataset.id, e.target.checked);
-    });
-
-    document.querySelectorAll("#todoList button.d").forEach(btn => {
-      btn.onclick = () => borrarTask(btn.dataset.id);
-    });
   }
 
   function setBudget(c, v){
     const n = parseFloat(v);
     if (n > 0) budgets[c] = n; else delete budgets[c];
-    set(ref(db, "gastos_app/budgets"), budgets);
+    save(); renderAll();
   }
 
   function borrar(id){
     if (!confirm("¿Eliminar este movimiento?")) return;
-    remove(ref(db, "gastos_app/tx/" + id));
+    tx = tx.filter(t => t.id !== id);
+    save(); renderAll();
   }
 
   function toggleTask(id, done){
-    update(ref(db, "gastos_app/tasks/" + id), { done });
+    const task = tasks.find(t => t.id === id);
+    if (task) task.done = done;
+    save(); renderTareas();
   }
 
   function borrarTask(id){
-    remove(ref(db, "gastos_app/tasks/" + id));
+    tasks = tasks.filter(t => t.id !== id);
+    save(); renderTareas();
   }
 
   function renderAll(){ 
@@ -474,7 +412,8 @@ HTML
     const monto = parseFloat($("monto").value);
     if (!(monto > 0)) return;
 
-    push(ref(db, "gastos_app/tx"), {
+    tx.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       tipo: $("tipo").value,
       date: $("fecha").value || today(),
       categoria: $("categoria").value,
@@ -484,6 +423,7 @@ HTML
 
     $("desc").value = ""; $("monto").value = "";
     if (!$("fecha").value.startsWith(currentMonth())) $("mes").value = $("fecha").value.slice(0,7);
+    save(); renderAll();
   });
 
   // Agregar Tarea Semanal
@@ -492,7 +432,8 @@ HTML
     const desc = $("taskDesc").value.trim();
     if (!desc) return;
 
-    push(ref(db, "gastos_app/tasks"), {
+    tasks.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
       desc,
       day: $("taskDay").value.trim(),
       done: false
@@ -500,6 +441,7 @@ HTML
 
     $("taskDesc").value = ""; 
     $("taskDay").value = "";
+    save(); renderTareas();
   });
 
   // Exportar CSV
@@ -523,6 +465,7 @@ HTML
   $("fecha").value = today();
   $("mes").addEventListener("change", renderAll);
   renderCategorias();
+  renderAll();
 </script>
 </body>
 </html>

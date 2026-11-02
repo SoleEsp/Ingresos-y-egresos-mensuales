@@ -3,8 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-
 <title>🐾 Control Gatuno de Gastos y Tareas 🐱</title>
 <style>
   * { box-sizing: border-box; }
@@ -13,6 +11,15 @@
     font-family: 'Nunito', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; 
     background: #fff5f8; 
     color: #4a3e3d; 
+  }
+  
+  .status { 
+    background: #e2f0d9; 
+    color: #385d25; 
+    padding: 8px 16px; 
+    font-size: 13px; 
+    text-align: center; 
+    font-weight: 700; 
   }
   
   header { 
@@ -111,7 +118,6 @@
   .muted { color: #94a3b8; font-size: 13px; }
   .hidden { display: none; }
 
-  /* Estilos Lista de Tareas Gatuna */
   .todo-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff0f6; border-radius: 12px; margin-bottom: 8px; border: 1px solid #fbcfe8; }
   .todo-item.done { background: #f1f5f9; text-decoration: line-through; opacity: 0.6; }
   .todo-item input[type=checkbox] { width: 18px; height: 18px; accent-color: #f472b6; cursor: pointer; }
@@ -121,6 +127,8 @@
 </style>
 </head>
 <body>
+
+<div id="status" class="status">🐾 Conectando con Firebase...</div>
 
 <header>
   <h1>🐱 Control Gatuno de Finanzas 🐾</h1>
@@ -215,42 +223,61 @@
 </main>
 
 <script type="module">
- import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
   import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
   const firebaseConfig = {
-  apiKey: "AIzaSyBziv1hLKWMCwfHlGTZJd1tJKq40Vk-XbQ",
-  authDomain: "ingresos-y-egresos-1bc94.firebaseapp.com",
-  databaseURL: "https://ingresos-y-egresos-1bc94-default-rtdb.firebaseio.com",
-  projectId: "ingresos-y-egresos-1bc94",
-  storageBucket: "ingresos-y-egresos-1bc94.firebasestorage.app",
-  messagingSenderId: "274337009988",
-  appId: "1:274337009988:web:25f73b87144fbc61dc0711",
-  measurementId: "G-SWCHR3DRZR"
-};
- const app = initializeApp(firebaseConfig);
- const db = getDatabase(app);
+    apiKey: "AIzaSyBziv1hLKWMCwfHlGTZJd1tJKq40Vk-XbQ",
+    authDomain: "ingresos-y-egresos-1bc94.firebaseapp.com",
+    databaseURL: "https://ingresos-y-egresos-1bc94-default-rtdb.firebaseio.com",
+    projectId: "ingresos-y-egresos-1bc94",
+    storageBucket: "ingresos-y-egresos-1bc94.appspot.com",
+    messagingSenderId: "274337009988",
+    appId: "1:274337009988:web:25f73b87144fbc61dc0711",
+    measurementId: "G-SWCHR3DRZR"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
 
   const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Educación","Ocio","Ropa","Mascotas 🐱","Otros"];
   const CATS_INGRESO = ["Salario","Freelance","Inversiones","Otros ingresos"];
   const PAL = ["#f472b6","#93c5fd","#86efac","#fde047","#c084fc","#fb923c","#f43f5e","#38bdf8","#a3e635","#e879f9"];
 
-  let tx = JSON.parse(localStorage.getItem("gastos_tx") || "[]");
-  let budgets = JSON.parse(localStorage.getItem("gastos_bud") || "{}");
-  let tasks = JSON.parse(localStorage.getItem("gastos_tasks") || "[]");
+  let tx = [];
+  let budgets = {};
+  let tasks = [];
 
   const $ = id => document.getElementById(id);
-  const save = () => {
-    localStorage.setItem("gastos_tx", JSON.stringify(tx));
-    localStorage.setItem("gastos_bud", JSON.stringify(budgets));
-    localStorage.setItem("gastos_tasks", JSON.stringify(tasks));
-  };
-
   const fmt = n => "$" + Number(n).toLocaleString("es", {minimumFractionDigits:2, maximumFractionDigits:2});
   const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
   const today = () => new Date().toISOString().slice(0,10);
   const currentMonth = () => $("mes").value;
 
   function monthKey(d){ return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+
+  // Listener en tiempo real corregido
+  onValue(ref(db, "gastos_app"), (snapshot) => {
+    const data = snapshot.val() || {};
+    
+    const rawTx = data.tx || {};
+    tx = Object.keys(rawTx).map(key => ({ id: key, ...rawTx[key] }));
+
+    budgets = data.budgets || {};
+
+    const rawTasks = data.tasks || {};
+    tasks = Object.keys(rawTasks).map(key => ({ id: key, ...rawTasks[key] }));
+    
+    $("status").innerText = "🐾 Conectado a Firebase — ¡Sincronizado en tiempo real! 🐱";
+    $("status").style.background = "#e2f0d9";
+    $("status").style.color = "#385d25";
+    
+    renderAll();
+  }, (error) => {
+    $("status").innerText = "⚠️ Error al conectar con Firebase.";
+    $("status").style.background = "#ffe4e6";
+    $("status").style.color = "#e11d48";
+  });
 
   function totalsFor(month){
     const list = tx.filter(t => t.date && t.date.startsWith(month));
@@ -355,9 +382,13 @@
         <td>${esc(t.categoria)}</td>
         <td>${esc(t.desc||'')}</td>
         <td class="r">${fmt(t.monto)}</td>
-        <td><button class="d" onclick="borrar('${t.id}')">Eliminar</button></td>
+        <td><button class="d" data-id="${t.id}">Eliminar</button></td>
       </tr>`).join("")
       : `<tr><td colspan="6" class="muted">No hay movimientos registrados este mes. 🐱</td></tr>`;
+
+    document.querySelectorAll("#tbody button.d").forEach(btn => {
+      btn.onclick = () => borrar(btn.dataset.id);
+    });
   }
 
   function renderPres(){
@@ -372,46 +403,55 @@
         <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <span><b>${c}</b> — Gastado ${fmt(gastado)}${lim>0 ? ` de ${fmt(lim)}` : ''}</span>
           <label style="flex-direction:row;align-items:center;gap:6px">Límite $
-            <input type="number" min="0" step="1" value="${lim||''}" onchange="setBudget('${c}', this.value)">
+            <input type="number" min="0" step="1" value="${lim||''}" data-cat="${c}" class="inp-budget">
           </label>
         </div>
         ${lim>0 ? `<div class="bar"><div class="${over?'over':''}" style="width:${pct}%"></div></div>` : ''}
       </div>`;
     }).join("");
+
+    document.querySelectorAll(".inp-budget").forEach(inp => {
+      inp.onchange = (e) => setBudget(e.target.dataset.cat, e.target.value);
+    });
   }
 
   function renderTareas(){
     const list = tasks.sort((a,b) => (a.done === b.done) ? 0 : a.done ? 1 : -1);
     $("todoList").innerHTML = list.length ? list.map(t => `
       <div class="todo-item ${t.done ? 'done' : ''}">
-        <input type="checkbox" ${t.done ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)">
+        <input type="checkbox" ${t.done ? 'checked' : ''} data-id="${t.id}" class="chk-task">
         <span>${esc(t.desc)} ${t.day ? `<small style="color:#71717a">(${esc(t.day)})</small>` : ''}</span>
-        <button class="d" onclick="borrarTask('${t.id}')">✕</button>
+        <button class="d" data-id="${t.id}">✕</button>
       </div>
     `).join("") : `<p class="muted">No hay tareas programadas para esta semana. 🐾</p>`;
+
+    document.querySelectorAll(".chk-task").forEach(chk => {
+      chk.onchange = (e) => toggleTask(e.target.dataset.id, e.target.checked);
+    });
+
+    document.querySelectorAll("#todoList button.d").forEach(btn => {
+      btn.onclick = () => borrarTask(btn.dataset.id);
+    });
   }
 
+  // Funciones de escritura con ref() corregido
   function setBudget(c, v){
     const n = parseFloat(v);
     if (n > 0) budgets[c] = n; else delete budgets[c];
-    save(); renderAll();
+    set(ref(db, "gastos_app/budgets"), budgets);
   }
 
   function borrar(id){
     if (!confirm("¿Eliminar este movimiento?")) return;
-    tx = tx.filter(t => t.id !== id);
-    save(); renderAll();
+    remove(ref(db, `gastos_app/tx/${id}`));
   }
 
   function toggleTask(id, done){
-    const task = tasks.find(t => t.id === id);
-    if (task) task.done = done;
-    save(); renderTareas();
+    update(ref(db, `gastos_app/tasks/${id}`), { done });
   }
 
   function borrarTask(id){
-    tasks = tasks.filter(t => t.id !== id);
-    save(); renderTareas();
+    remove(ref(db, `gastos_app/tasks/${id}`));
   }
 
   function renderAll(){ 
@@ -423,14 +463,13 @@
 
   $("tipo").addEventListener("change", renderCategorias);
   
-  // Agregar Transacción
+  // Guardar Transacciones en Firebase
   $("form").addEventListener("submit", e => {
     e.preventDefault();
     const monto = parseFloat($("monto").value);
     if (!(monto > 0)) return;
 
-    tx.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    push(ref(db, "gastos_app/tx"), {
       tipo: $("tipo").value,
       date: $("fecha").value || today(),
       categoria: $("categoria").value,
@@ -440,17 +479,15 @@
 
     $("desc").value = ""; $("monto").value = "";
     if (!$("fecha").value.startsWith(currentMonth())) $("mes").value = $("fecha").value.slice(0,7);
-    save(); renderAll();
   });
 
-  // Agregar Tarea Semanal
+  // Guardar Tareas en Firebase
   $("formTask").addEventListener("submit", e => {
     e.preventDefault();
     const desc = $("taskDesc").value.trim();
     if (!desc) return;
 
-    tasks.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+    push(ref(db, "gastos_app/tasks"), {
       desc,
       day: $("taskDay").value.trim(),
       done: false
@@ -458,7 +495,6 @@
 
     $("taskDesc").value = ""; 
     $("taskDay").value = "";
-    save(); renderTareas();
   });
 
   // Exportar CSV
@@ -471,7 +507,7 @@
     a.href = URL.createObjectURL(blob); a.download = `gastos_${m}.csv`; a.click();
   });
 
-  // Navegación de pestañas
+  // Control de Navegación de pestañas
   document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
     document.querySelectorAll("nav button").forEach(x => x.classList.remove("active"));
     b.classList.add("active");
@@ -482,7 +518,6 @@
   $("fecha").value = today();
   $("mes").addEventListener("change", renderAll);
   renderCategorias();
-  renderAll();
 </script>
 </body>
 </html>

@@ -215,6 +215,8 @@
 </main>
 
 <script>
+ import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
   const firebaseConfig = {
   apiKey: "AIzaSyBziv1hLKWMCwfHlGTZJd1tJKq40Vk-XbQ",
   authDomain: "ingresos-y-egresos-1bc94.firebaseapp.com",
@@ -225,6 +227,8 @@
   appId: "1:274337009988:web:25f73b87144fbc61dc0711",
   measurementId: "G-SWCHR3DRZR"
 };
+ const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
   const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Educación","Ocio","Ropa","Mascotas 🐱","Otros"];
   const CATS_INGRESO = ["Salario","Freelance","Inversiones","Otros ingresos"];
   const PAL = ["#f472b6","#93c5fd","#86efac","#fde047","#c084fc","#fb923c","#f43f5e","#38bdf8","#a3e635","#e879f9"];

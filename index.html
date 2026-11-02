@@ -214,9 +214,9 @@
   </section>
 </main>
 
-<script>
- import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+<script type="module">
+ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+  import { getDatabase, ref, onValue, set, push, remove, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
   const firebaseConfig = {
   apiKey: "AIzaSyBziv1hLKWMCwfHlGTZJd1tJKq40Vk-XbQ",
   authDomain: "ingresos-y-egresos-1bc94.firebaseapp.com",

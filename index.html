@@ -228,6 +228,7 @@
   measurementId: "G-SWCHR3DRZR"
 };
  const app = initializeApp(firebaseConfig);
+ const db = getDatabase(app);
 
   const CATS_GASTO = ["Vivienda","Alimentación","Transporte","Servicios","Salud","Educación","Ocio","Ropa","Mascotas 🐱","Otros"];
   const CATS_INGRESO = ["Salario","Freelance","Inversiones","Otros ingresos"];
